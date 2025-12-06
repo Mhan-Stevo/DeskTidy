@@ -17,7 +17,7 @@ class MainWindow(QMainWindow):
 
         self.init_ui()
 
-    def init_ui(self):
+    def init_ui(self, title=None):
         layout = QVBoxLayout()
 
         # Title
