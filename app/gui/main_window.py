@@ -22,7 +22,7 @@ class MainWindow(QMainWindow):
 
         # Title
         title = QLabel("DeskTidy — Desktop Cleaner")
-        title.setAlignment(Qt.AlignCenter)
+        title.setAlignment(Qt.AlignLeft)
         title.setStyleSheet("font-size: 24px; font-weight: bold; margin: 10px;")
         layout.addWidget(title)
 
