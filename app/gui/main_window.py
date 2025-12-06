@@ -21,7 +21,7 @@ class MainWindow(QMainWindow):
         layout = QVBoxLayout()
 
         # Title
-        title = QLabel("DeskTidy — Desktop Cleaner")
+        title = QLabel("DeskTidy")
         title.setAlignment(Qt.AlignLeft)
         title.setStyleSheet("font-size: 24px; font-weight: bold; margin: 10px;")
         layout.addWidget(title)
