@@ -23,7 +23,7 @@ class DashboardTab(QWidget):
         welcome_frame.setFrameStyle(QFrame.Panel | QFrame.Raised)
         welcome_layout = QHBoxLayout(welcome_frame)
 
-        welcome_label = QLabel("Welcome to FileCleaner Pro")
+        welcome_label = QLabel("Welcome to DeskTidy")
         welcome_label.setFont(QFont("Arial", 16, QFont.Bold))
         welcome_layout.addWidget(welcome_label)
 
