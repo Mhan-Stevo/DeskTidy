@@ -1,2 +1,5 @@
-PyQt5~=5.15.11
-sc-pylibs~=0.0.0.1
+PyQt5==5.15.9
+python-magic==0.4.27
+psutil==5.9.6
+schedule==1.2.0
+send2trash==1.8.2

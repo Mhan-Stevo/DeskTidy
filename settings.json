@@ -1,0 +1,28 @@
+{
+  "theme": "light",
+  "accent_color": "#007acc",
+  "rules": {
+    "delete_tmp": true,
+    "delete_log": false,
+    "delete_cache": false,
+    "file_age_days": 30,
+    "min_size_mb": 1,
+    "custom_extensions": [
+      ".bak",
+      ".old",
+      ".backup"
+    ]
+  },
+  "auto_preview": false,
+  "confirm_deletions": true,
+  "max_file_size": 100,
+  "categories": [
+    "Temporary Files",
+    "Log Files",
+    "Cache Files"
+  ],
+  "recent_folders": [
+    "/home/user/Downloads",
+    "/home/user/Desktop"
+  ]
+}
