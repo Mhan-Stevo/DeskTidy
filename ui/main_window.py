@@ -1,3 +1,12 @@
+"""
+Main application window
+-----------------------
+Creates the primary `QMainWindow`, sets up the tabbed UI, status bar,
+and application menu. The MainWindow wires together the `settings` and
+`logger` objects with the tab widgets so the UI can interact with the
+core logic (settings persistence, logging, and running cleaners).
+"""
+
 from PyQt5.QtWidgets import (QMainWindow, QTabWidget, QVBoxLayout,
                              QWidget, QStatusBar, QAction, QMenuBar,
                              QMessageBox)
@@ -9,55 +18,62 @@ from ui.tabs.logs_tab import LogsTab
 
 class MainWindow(QMainWindow):
     def __init__(self, settings, logger):
+        # `settings` should implement get/set/save methods
+        # `logger` should expose signal `log_added` and methods like get_logs
         super().__init__()
         self.settings = settings
         self.logger = logger
+
+        # Build UI and menus
         self.init_ui()
         self.setup_menu()
 
     def init_ui(self):
+        # Window basic properties
         self.setWindowTitle("FileCleaner Pro")
         self.setGeometry(100, 100, 1200, 800)
 
-        # Create central widget and layout
+        # Central widget holds the tab widget layout
         central_widget = QWidget()
         self.setCentralWidget(central_widget)
         layout = QVBoxLayout(central_widget)
 
-        # Create tab widget
+        # Tab widget contains the primary application screens
         self.tab_widget = QTabWidget()
         self.tab_widget.setTabPosition(QTabWidget.North)
         self.tab_widget.setMovable(False)  # Keep tabs in fixed order
 
-        # Create tabs with dependencies
+        # Instantiate tabs and inject dependencies where required
         self.file_cleaner_tab = FileCleanerTab(self.settings, self.logger)
         self.settings_tab = SettingsTab(self.settings)
         self.logs_tab = LogsTab(self.settings, self.logger)
 
-        # Connect logger signals
+        # Wire logger's signal to the logs tab so the UI updates live
         self.logger.log_added.connect(self.logs_tab.on_new_log)
 
-        # Add tabs with icons and tooltips
+        # Add tabs to the QTabWidget (text icons used for simplicity)
         self.tab_widget.addTab(self.file_cleaner_tab, "📁 File Cleaner")
         self.tab_widget.addTab(self.settings_tab, "⚙️ Settings")
         self.tab_widget.addTab(self.logs_tab, "📈 Logs")
 
-        # Set tab tooltips
+        # Helpful tooltips for each tab
         self.tab_widget.setTabToolTip(0, "Clean files and folders")
         self.tab_widget.setTabToolTip(1, "Configure application settings")
         self.tab_widget.setTabToolTip(2, "View cleaning history")
 
         layout.addWidget(self.tab_widget)
 
-        # Status bar
+        # Simple status bar to show short messages
         self.status_bar = QStatusBar()
         self.setStatusBar(self.status_bar)
         self.status_bar.showMessage("Ready")
 
-        # Apply theme
+        # Apply the persisted theme (if any)
         self.apply_theme()
 
     def apply_theme(self):
+        # Apply a stylesheet based on persisted theme name. Styles are
+        # embedded here for simplicity; a larger app might load .qss files.
         theme = self.settings.get("theme", "light")
         if theme == "dark":
             self.setStyleSheet("""
@@ -145,7 +161,7 @@ class MainWindow(QMainWindow):
     def setup_menu(self):
         menubar = self.menuBar()
 
-        # File menu
+        # File menu with an export logs action and exit
         file_menu = menubar.addMenu("File")
 
         export_action = QAction("Export Logs...", self)
@@ -160,7 +176,7 @@ class MainWindow(QMainWindow):
         exit_action.setShortcut("Ctrl+Q")
         file_menu.addAction(exit_action)
 
-        # Edit menu
+        # Edit menu contains quick navigation to settings
         edit_menu = menubar.addMenu("Edit")
 
         settings_action = QAction("Settings", self)
@@ -168,7 +184,7 @@ class MainWindow(QMainWindow):
         settings_action.setShortcut("Ctrl+,")
         edit_menu.addAction(settings_action)
 
-        # View menu
+        # View menu contains UI-level commands (refresh + open logs)
         view_menu = menubar.addMenu("View")
 
         refresh_action = QAction("Refresh Preview", self)
@@ -183,7 +199,7 @@ class MainWindow(QMainWindow):
 
         view_menu.addSeparator()
 
-        # Theme submenu
+        # Theme submenu to change styling at runtime
         theme_menu = view_menu.addMenu("Theme")
 
         light_theme = QAction("Light", self)
@@ -198,7 +214,7 @@ class MainWindow(QMainWindow):
         blue_theme.triggered.connect(lambda: self.change_theme("blue"))
         theme_menu.addAction(blue_theme)
 
-        # Help menu
+        # Help menu with documentation and about dialog
         help_menu = menubar.addMenu("Help")
 
         docs_action = QAction("Documentation", self)
@@ -212,6 +228,9 @@ class MainWindow(QMainWindow):
         help_menu.addAction(about_action)
 
     def change_theme(self, theme_name):
+        # Persist chosen theme and re-apply styles immediately. The
+        # message suggests a restart but here we simply reapply the
+        # stylesheet so changes take effect in the running instance.
         self.settings.set("theme", theme_name)
         self.settings.save()
         self.apply_theme()
@@ -220,6 +239,9 @@ class MainWindow(QMainWindow):
                                 "Application will restart with new theme.")
 
     def show_about(self):
+        # Display an about dialog with basic product info. This is a
+        # simple, hard-coded HTML string; internationalization would move
+        # these strings to a resource or translation files.
         QMessageBox.about(self, "About FileCleaner Pro",
                           "<h2>FileCleaner Pro</h2>"
                           "<p>Version 1.0.0</p>"
@@ -235,14 +257,18 @@ class MainWindow(QMainWindow):
                           "</ul>")
 
     def closeEvent(self, event):
-        """Handle application close event"""
-        # Save settings
+        """Handle application close event.
+
+        Saves settings, logs shutdown, and asks the user to confirm if a
+        cleanup operation is currently running.
+        """
+        # Persist settings immediately
         self.settings.save()
 
-        # Log shutdown
+        # Emit a final log entry
         self.logger.log_action("System", "Application shutdown", status="Info")
 
-        # Confirm close if cleanup is in progress
+        # If a cleanup thread is running, ask the user whether to abort
         if hasattr(self.file_cleaner_tab, 'cleaner_thread') and self.file_cleaner_tab.cleaner_thread.isRunning():
             reply = QMessageBox.question(
                 self, "Cleanup in Progress",
@@ -252,7 +278,9 @@ class MainWindow(QMainWindow):
             )
 
             if reply == QMessageBox.No:
+                # User chose not to exit while cleanup is running
                 event.ignore()
                 return
 
+        # Allow the window to close
         event.accept()

@@ -4,21 +4,33 @@ from pathlib import Path
 
 
 class RulesEngine:
-    """Advanced rules engine for file filtering"""
+    """Advanced rules engine for file filtering.
+
+    The engine supports multiple rule types (age, size, extension
+    patterns, name patterns, excluded folders and category based rules)
+    and produces a score and reasons for why a file should be deleted.
+    """
 
     def __init__(self):
+        # Container for the loaded rules configuration
         self.rules = {}
 
     def load_rules(self, rules_config):
-        """Load rules from configuration"""
+        """Load rules from an external configuration (dict)."""
         self.rules = rules_config
 
     def evaluate_file(self, file_info):
-        """Evaluate if a file should be deleted based on rules"""
+        """Evaluate a file against the rules and return (should_delete, reasons).
+
+        `file_info` is expected to be a dict with at least 'modified',
+        'size', 'extension' and 'name' keys. A scoring system is used —
+        if the cumulative score reaches 2 or more the file is marked
+        as deletable. The method returns a boolean plus a list of reasons.
+        """
         score = 0
         reasons = []
 
-        # File age rule
+        # Age-based rule
         if 'max_age_days' in self.rules:
             max_age = self.rules['max_age_days']
             file_age = (datetime.now() - file_info['modified']).days
@@ -26,14 +38,14 @@ class RulesEngine:
                 score += 1
                 reasons.append(f"Old file ({file_age} days > {max_age} days)")
 
-        # File size rule
+        # Size-based rule
         if 'min_size_mb' in self.rules:
             min_size_bytes = self.rules['min_size_mb'] * 1024 * 1024
             if file_info['size'] > min_size_bytes:
                 score += 1
                 reasons.append(f"Large file ({file_info['size'] / 1024 / 1024:.1f}MB)")
 
-        # Extension rules
+        # Extension patterns (regular expressions)
         if 'delete_extensions' in self.rules:
             for pattern in self.rules['delete_extensions']:
                 if re.match(pattern, file_info['extension'], re.IGNORECASE):
@@ -41,21 +53,21 @@ class RulesEngine:
                     reasons.append(f"Extension matches: {pattern}")
                     break
 
-        # Name pattern rules
+        # Filename regex patterns
         if 'name_patterns' in self.rules:
             for pattern in self.rules['name_patterns']:
                 if re.search(pattern, file_info['name'], re.IGNORECASE):
                     score += 1
                     reasons.append(f"Name matches pattern: {pattern}")
 
-        # Folder location rules
+        # Excluded/protected folders subtract a large score to prevent deletion
         if 'excluded_folders' in self.rules:
             for folder in self.rules['excluded_folders']:
                 if folder in file_info['path']:
-                    score -= 10  # Negative score to protect
+                    score -= 10  # strong protection
                     reasons.append(f"Protected folder: {folder}")
 
-        # Category-based rules
+        # Category-based rules allow grouping of file types with specific actions
         if 'categories' in self.rules:
             file_category = self.categorize_file(file_info)
             if file_category in self.rules['categories']:
@@ -64,10 +76,14 @@ class RulesEngine:
                     score += 3
                     reasons.append(f"Category: {file_category}")
 
-        return score >= 2, reasons  # File should be deleted if score >= 2
+        # Return a decision and the collected reasons for transparency
+        return score >= 2, reasons
 
     def categorize_file(self, file_info):
-        """Categorize file based on extension and MIME type"""
+        """Classify a file into a category such as images, documents, videos.
+
+        Uses file extension first and MIME type (if provided) as a fallback.
+        """
         extension = file_info['extension'].lower()
         mime_type = file_info.get('mime_type', '')
 
@@ -108,7 +124,10 @@ class RulesEngine:
         return 'other'
 
     def validate_rules(self):
-        """Validate rules configuration"""
+        """Simple validation for the rules configuration.
+
+        Returns a list of human-readable error strings.
+        """
         errors = []
 
         if 'max_age_days' in self.rules:

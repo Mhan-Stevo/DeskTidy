@@ -8,8 +8,10 @@ from core.disk_analyzer import DiskAnalyzer
 
 
 class AnalysisThread(QThread):
-    progress = pyqtSignal(int, str)
-    analysis_complete = pyqtSignal(dict)
+    """Worker thread that performs disk analysis to avoid blocking UI."""
+
+    progress = pyqtSignal(int, str)  # progress percent and message
+    analysis_complete = pyqtSignal(dict)  # emits final stats dict
 
     def __init__(self, folder_path):
         super().__init__()
@@ -19,14 +21,14 @@ class AnalysisThread(QThread):
     def run(self):
         self.progress.emit(0, "Starting analysis...")
 
-        # Load from cache if available
+        # Try to load cached results first to save time
         cached = self.analyzer.load_analysis(self.folder_path)
         if cached:
             self.progress.emit(50, "Loading cached analysis...")
             self.analysis_complete.emit(cached['stats'])
             return
 
-        # Perform fresh analysis
+        # Perform fresh analysis and compute recommendations
         self.progress.emit(10, "Scanning folder structure...")
         stats = self.analyzer.analyze_folder(self.folder_path)
 
@@ -41,6 +43,8 @@ class AnalysisThread(QThread):
 
 
 class AnalysisTab(QWidget):
+    """Tab that allows users to analyze a folder and view recommendations."""
+
     def __init__(self, settings, logger):
         super().__init__()
         self.settings = settings
@@ -51,7 +55,7 @@ class AnalysisTab(QWidget):
     def init_ui(self):
         layout = QVBoxLayout(self)
 
-        # Folder selection
+        # Folder selection area
         folder_group = QGroupBox("Select Folder to Analyze")
         folder_layout = QHBoxLayout()
 
@@ -71,7 +75,7 @@ class AnalysisTab(QWidget):
         folder_group.setLayout(folder_layout)
         layout.addWidget(folder_group)
 
-        # Progress bar
+        # Progress UI
         self.progress_bar = QProgressBar()
         self.progress_bar.hide()
         layout.addWidget(self.progress_bar)
@@ -80,10 +84,10 @@ class AnalysisTab(QWidget):
         self.progress_label.hide()
         layout.addWidget(self.progress_label)
 
-        # Splitter for results
+        # Splitter to show stats and recommendations
         splitter = QSplitter(Qt.Vertical)
 
-        # Statistics panel
+        # Statistics tree view
         stats_group = QGroupBox("Statistics")
         stats_layout = QVBoxLayout()
 
@@ -95,7 +99,7 @@ class AnalysisTab(QWidget):
         stats_group.setLayout(stats_layout)
         splitter.addWidget(stats_group)
 
-        # Recommendations panel
+        # Recommendations table
         rec_group = QGroupBox("Recommendations")
         rec_layout = QVBoxLayout()
 
@@ -111,7 +115,7 @@ class AnalysisTab(QWidget):
         splitter.setSizes([300, 200])
         layout.addWidget(splitter)
 
-        # Action buttons
+        # Action buttons (apply recommendations / export report)
         button_layout = QHBoxLayout()
 
         self.clean_btn = QPushButton("🧹 Apply Recommendations")
@@ -136,6 +140,7 @@ class AnalysisTab(QWidget):
             self.analyze_btn.setEnabled(True)
 
     def start_analysis(self):
+        # Start analysis in a background thread and show progress UI
         self.progress_bar.show()
         self.progress_label.show()
         self.progress_bar.setValue(0)
@@ -147,19 +152,21 @@ class AnalysisTab(QWidget):
 
     @pyqtSlot(int, str)
     def update_progress(self, value, message):
+        # Update progress bar and label
         self.progress_bar.setValue(value)
         self.progress_label.setText(message)
 
     @pyqtSlot(dict)
     def display_analysis(self, stats):
+        # Receive final analysis results and populate the UI
         self.current_analysis = stats
         self.progress_bar.hide()
         self.progress_label.hide()
 
-        # Display statistics
+        # Clear previous stats
         self.stats_tree.clear()
 
-        # Basic stats
+        # Basic information
         basic_item = QTreeWidgetItem(["Basic Information"])
         basic_item.addChild(QTreeWidgetItem(["Total Size", self.format_size(stats['total_size'])]))
         basic_item.addChild(QTreeWidgetItem(["File Count", str(stats['file_count'])]))
@@ -178,7 +185,7 @@ class AnalysisTab(QWidget):
             age_item.addChild(QTreeWidgetItem([age_range, self.format_size(size)]))
         self.stats_tree.addTopLevelItem(age_item)
 
-        # File extensions
+        # File extensions (largest contributors)
         ext_item = QTreeWidgetItem(["Largest File Types"])
         sorted_exts = sorted(stats['by_extension'].items(), key=lambda x: x[1], reverse=True)[:10]
         for ext, size in sorted_exts:
@@ -187,30 +194,32 @@ class AnalysisTab(QWidget):
 
         self.stats_tree.expandAll()
 
-        # Display recommendations
+        # Display recommendations in the table
         self.display_recommendations(stats.get('recommendations', []))
 
+        # Enable action buttons now that analysis is present
         self.clean_btn.setEnabled(True)
         self.export_btn.setEnabled(True)
 
     def display_recommendations(self, recommendations):
+        # Populate recommendations table with each suggested action
         self.rec_table.setRowCount(len(recommendations))
 
         for row, rec in enumerate(recommendations):
-            # Type
+            # Type column
             type_item = QTableWidgetItem(rec['type'].replace('_', ' ').title())
             self.rec_table.setItem(row, 0, type_item)
 
-            # Description
+            # Description column
             desc_item = QTableWidgetItem(rec['description'])
             self.rec_table.setItem(row, 1, desc_item)
 
-            # Potential Savings
+            # Potential savings (MB)
             savings_item = QTableWidgetItem(f"{rec['potential_savings']:.1f} MB")
             savings_item.setTextAlignment(Qt.AlignRight | Qt.AlignVCenter)
             self.rec_table.setItem(row, 2, savings_item)
 
-            # Priority
+            # Priority column with color coding
             priority_item = QTableWidgetItem(rec['priority'].upper())
             if rec['priority'] == 'high':
                 priority_item.setForeground(QColor('#e74c3c'))
@@ -222,7 +231,7 @@ class AnalysisTab(QWidget):
             self.rec_table.setItem(row, 3, priority_item)
 
     def format_size(self, size_bytes):
-        """Format bytes to human readable string"""
+        """Convert bytes to a human-readable string with units."""
         for unit in ['B', 'KB', 'MB', 'GB', 'TB']:
             if size_bytes < 1024.0:
                 return f"{size_bytes:.2f} {unit}"
@@ -230,9 +239,9 @@ class AnalysisTab(QWidget):
         return f"{size_bytes:.2f} PB"
 
     def apply_recommendations(self):
-        # Implement recommendation application logic
+        # Placeholder for logic to apply recommendations automatically
         pass
 
     def export_report(self):
-        # Implement report export logic
+        # Placeholder for export/reporting logic
         pass

@@ -1,6 +1,6 @@
-"""
-UI Tabs module.
-Contains the main tab widgets for the FileCleaner Pro application.
+"""Tab package exports for the UI.
+
+Re-exports each tab widget so callers can import them from `ui.tabs`.
 """
 
 from .file_cleaner_tab import FileCleanerTab

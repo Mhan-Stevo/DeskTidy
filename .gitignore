@@ -1,0 +1,13 @@
+__pycache__/
+*.pyc
+.idea/
+.venv/
+venv/
+dist/
+build/
+.pytest_cache/
+/.vscode/
+
+# Ignore environment files
+env/
+ENV/

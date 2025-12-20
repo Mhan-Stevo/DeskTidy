@@ -1,0 +1,97 @@
+digraph DeskTidy_Architecture {
+    rankdir=TB;
+    node [shape=box, style=rounded];
+    
+    // Main entry point
+    main [label="main.py\n(Entry Point)", color=lightblue, style="rounded,filled"];
+    
+    // Core modules
+    sm [label="SettingsManager\n(settings_manager.py)", color=lightgreen, style="rounded,filled"];
+    logger [label="Logger\n(logger.py)", color=lightgreen, style="rounded,filled"];
+    fo [label="FileOperations\n(file_ops.py)", color=lightgreen, style="rounded,filled"];
+    da [label="DiskAnalyzer\n(disk_analyzer.py)", color=lightgreen, style="rounded,filled"];
+    fc [label="FileCleaner\n(cleaner.py)", color=lightgreen, style="rounded,filled"];
+    re [label="RulesEngine\n(rules_engine.py)", color=lightgreen, style="rounded,filled"];
+    bp [label="BatchProcessor\n(batch_processor.py)", color=lightgreen, style="rounded,filled"];
+    sch [label="Scheduler\n(scheduler.py)", color=lightgreen, style="rounded,filled"];
+    
+    // UI - Main Window
+    mw [label="MainWindow\n(main_window.py)", color=lightyellow, style="rounded,filled"];
+    
+    // UI - Tabs
+    fct [label="FileCleanerTab\n(file_cleaner_tab.py)", color=lightyellow, style="rounded,filled"];
+    at [label="AnalysisTab\n(analysis_tab.py)", color=lightyellow, style="rounded,filled"];
+    st [label="SettingsTab\n(settings_tab.py)", color=lightyellow, style="rounded,filled"];
+    lt [label="LogsTab\n(logs_tab.py)", color=lightyellow, style="rounded,filled"];
+    dt [label="DashboardTab\n(dashboard_tab.py)", color=lightyellow, style="rounded,filled"];
+    
+    // UI - Components
+    fc_comp [label="FolderChooser\n(folder_chooser.py)", color=lightcyan, style="rounded,filled"];
+    pp [label="PreviewPanel\n(preview_panel.py)", color=lightcyan, style="rounded,filled"];
+    
+    // Worker threads
+    ct [label="CleanerThread\n(file_cleaner_tab.py)", color=orange, style="rounded,filled"];
+    at_thread [label="AnalysisThread\n(analysis_tab.py)", color=orange, style="rounded,filled"];
+    
+    // Startup flow
+    main -> sm [label="load()", color=blue, penwidth=2];
+    main -> logger [label="create", color=blue, penwidth=2];
+    main -> mw [label="MainWindow(settings,\nlogger)", color=blue, penwidth=2];
+    
+    // MainWindow wiring
+    mw -> fct [label="instantiate"];
+    mw -> at [label="instantiate"];
+    mw -> st [label="instantiate"];
+    mw -> lt [label="instantiate"];
+    mw -> dt [label="instantiate"];
+    mw -> logger [label="log_added.connect\n(LogsTab)"];
+    
+    // Tab dependencies
+    fct -> sm [label="get settings"];
+    fct -> logger [label="log_action"];
+    fct -> fc_comp [label="uses"];
+    fct -> pp [label="uses"];
+    fct -> ct [label="start cleanup"];
+    
+    at -> da [label="analyze_folder()"];
+    at -> at_thread [label="start analysis"];
+    at -> logger [label="log_action"];
+    
+    st -> sm [label="get/set/save"];
+    st -> logger [label="log_action"];
+    
+    lt -> logger [label="get_logs()\nsave_logs()\non_new_log signal"];
+    lt -> sm [label="get settings"];
+    
+    dt -> logger [label="get_logs()"];
+    dt -> sm [label="get settings"];
+    
+    // Core module interactions
+    ct -> fc [label="scan_files,\nfilter_files,\nclean_files"];
+    fc -> re [label="evaluate_file()"];
+    fc -> fo [label="safe_delete()"];
+    fc -> logger [label="log_action"];
+    
+    at_thread -> da [label="analyze_folder()"];
+    da -> fo [label="get_file_hash,\nget_file_info"];
+    da -> sm [label="get settings"];
+    
+    bp -> fo [label="process batch\nfile operations"];
+    bp -> re [label="evaluate_file()"];
+    bp -> logger [label="file_processed\nsignal"];
+    
+    sch -> logger [label="log_action\n(cleanup triggered)"];
+    
+    // Cross-core dependencies
+    re -> sm [label="get rules from\nsettings"];
+    
+    // Legend
+    subgraph cluster_legend {
+        label="Legend";
+        l1 [label="Entry Point", color=lightblue, style="rounded,filled"];
+        l2 [label="Core Logic", color=lightgreen, style="rounded,filled"];
+        l3 [label="UI Tabs", color=lightyellow, style="rounded,filled"];
+        l4 [label="UI Components", color=lightcyan, style="rounded,filled"];
+        l5 [label="Worker Threads", color=orange, style="rounded,filled"];
+    }
+}

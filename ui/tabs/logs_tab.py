@@ -11,29 +11,34 @@ import csv
 
 
 class LogsTab(QWidget):
+    """Tab for viewing, filtering and exporting application logs."""
+
     def __init__(self, settings, logger):
         super().__init__()
         self.settings = settings
         self.logger = logger
-        self.logs = []
+        self.logs = []  # in-memory cache of log entries
         self.init_ui()
         self.load_logs()
 
     def init_ui(self):
+        # Main vertical layout
         layout = QVBoxLayout(self)
 
-        # Filter controls
+        # --- Filter controls ---
         filter_layout = QHBoxLayout()
 
         filter_layout.addWidget(QLabel("Filter by:"))
 
         self.filter_type = QComboBox()
+        # Options for the action type filter
         self.filter_type.addItems(["All", "Deletion", "Preview", "Error", "System"])
         self.filter_type.currentTextChanged.connect(self.apply_filters)
         filter_layout.addWidget(self.filter_type)
 
         filter_layout.addWidget(QLabel("Date range:"))
 
+        # Date range selectors (from / to)
         self.date_from = QDateEdit()
         self.date_from.setDate(QDate.currentDate().addDays(-7))
         self.date_from.dateChanged.connect(self.apply_filters)
@@ -48,6 +53,7 @@ class LogsTab(QWidget):
         self.date_to.setCalendarPopup(True)
         filter_layout.addWidget(self.date_to)
 
+        # Clear filter button with a small style
         self.clear_filter_btn = QPushButton("Clear Filters")
         self.clear_filter_btn.clicked.connect(self.clear_filters)
         self.clear_filter_btn.setStyleSheet("""
@@ -66,12 +72,12 @@ class LogsTab(QWidget):
         filter_layout.addStretch()
         layout.addLayout(filter_layout)
 
-        # Stats label
+        # Stats label showing counts
         self.stats_label = QLabel("Total logs: 0")
         self.stats_label.setStyleSheet("font-weight: bold; color: #666;")
         layout.addWidget(self.stats_label)
 
-        # Logs table
+        # --- Logs table ---
         self.logs_table = QTableWidget()
         self.logs_table.setColumnCount(5)
         self.logs_table.setHorizontalHeaderLabels([
@@ -89,7 +95,7 @@ class LogsTab(QWidget):
         self.logs_table.setSortingEnabled(True)
         layout.addWidget(self.logs_table)
 
-        # Action buttons
+        # --- Action buttons ---
         button_layout = QHBoxLayout()
 
         self.refresh_btn = QPushButton("🔄 Refresh")
@@ -111,21 +117,22 @@ class LogsTab(QWidget):
         layout.addLayout(button_layout)
 
     def load_logs(self):
-        """Load logs from logger"""
+        """Load logs from the Logger and refresh the table."""
         self.logs = self.logger.get_logs()
         self.apply_filters()
         self.stats_label.setText(f"Total logs: {len(self.logs)} | Filtered: {self.logs_table.rowCount()}")
 
     def display_logs(self, logs):
+        """Populate the table widget with the provided `logs` list."""
         self.logs_table.setRowCount(len(logs))
 
         for row, log in enumerate(logs):
-            # Timestamp
+            # Timestamp column: show formatted string and store datetime for sorting
             timestamp_item = QTableWidgetItem(log["timestamp"].strftime("%Y-%m-%d %H:%M:%S"))
             timestamp_item.setData(0, log["timestamp"])  # Store actual datetime for sorting
             self.logs_table.setItem(row, 0, timestamp_item)
 
-            # Action with color coding
+            # Action column with basic color and emoji decoration
             action_item = QTableWidgetItem(log["action"])
             if log["action"] == "Deletion":
                 action_item.setForeground(QColor("#e74c3c"))  # Red
@@ -141,16 +148,16 @@ class LogsTab(QWidget):
                 action_item.setText("⚙️ " + log["action"])
             self.logs_table.setItem(row, 1, action_item)
 
-            # Details
+            # Details column
             details_item = QTableWidgetItem(log["details"])
             self.logs_table.setItem(row, 2, details_item)
 
-            # Files
+            # Files column (numeric)
             files_item = QTableWidgetItem(str(log["files"]))
             files_item.setTextAlignment(Qt.AlignRight | Qt.AlignVCenter)
             self.logs_table.setItem(row, 3, files_item)
 
-            # Status
+            # Status column with icon and color based on status text
             status_item = QTableWidgetItem(log["status"])
             if log["status"] == "Success":
                 status_item.setForeground(QColor("#2ecc71"))  # Green
@@ -164,28 +171,27 @@ class LogsTab(QWidget):
 
     @pyqtSlot(dict)
     def on_new_log(self, log_entry):
-        """Slot called when a new log is added"""
-        # Add to logs list
-        self.logs.insert(0, log_entry)  # Add at beginning (newest first)
+        """Slot called when a new log is emitted by the Logger."""
+        # Insert at the beginning so newest entries appear first
+        self.logs.insert(0, log_entry)
 
-        # Apply current filters
+        # Re-apply the current filters and update counts
         self.apply_filters()
-
-        # Update stats
         self.stats_label.setText(f"Total logs: {len(self.logs)} | Filtered: {self.logs_table.rowCount()}")
 
     def apply_filters(self):
+        """Filter the in-memory logs list by action type and date range."""
         filter_type = self.filter_type.currentText()
         date_from = self.date_from.date().toPyDate()
         date_to = self.date_to.date().toPyDate()
 
         filtered_logs = []
         for log in self.logs:
-            # Filter by type
+            # Filter by type if not 'All'
             if filter_type != "All" and log["action"] != filter_type:
                 continue
 
-            # Filter by date
+            # Filter by date range
             log_date = log["timestamp"].date()
             if not (date_from <= log_date <= date_to):
                 continue
@@ -195,12 +201,14 @@ class LogsTab(QWidget):
         self.display_logs(filtered_logs)
 
     def clear_filters(self):
+        # Reset filters to defaults and refresh
         self.filter_type.setCurrentText("All")
         self.date_from.setDate(QDate.currentDate().addDays(-7))
         self.date_to.setDate(QDate.currentDate())
         self.apply_filters()
 
     def export_logs(self):
+        """Export currently filtered logs to CSV, JSON or TXT format."""
         file_path, selected_filter = QFileDialog.getSaveFileName(
             self, "Export Logs", "filecleaner_logs",
             "CSV Files (*.csv);;JSON Files (*.json);;Text Files (*.txt)"
@@ -210,20 +218,19 @@ class LogsTab(QWidget):
             return
 
         try:
-            # Get currently filtered logs
+            # Build a list of currently visible entries from the table
             filtered_logs = []
             for i in range(self.logs_table.rowCount()):
                 log = {
                     'timestamp': self.logs_table.item(i, 0).text(),
-                    'action': self.logs_table.item(i, 1).text().replace("🗑️ ", "").replace("🔍 ", "").replace("⚠️ ",
-                                                                                                             "").replace(
-                        "⚙️ ", ""),
+                    'action': self.logs_table.item(i, 1).text().replace("🗑️ ", "").replace("🔍 ", "").replace("⚠️ ", "").replace("⚙️ ", ""),
                     'details': self.logs_table.item(i, 2).text(),
                     'files': int(self.logs_table.item(i, 3).text()),
                     'status': self.logs_table.item(i, 4).text().replace("✅ ", "").replace("❌ ", "").replace("📝 ", "")
                 }
                 filtered_logs.append(log)
 
+            # Write selected format
             if selected_filter == "JSON Files (*.json)":
                 if not file_path.endswith('.json'):
                     file_path += '.json'
@@ -271,6 +278,7 @@ class LogsTab(QWidget):
                                  f"❌ Failed to export logs:\n\n{str(e)}")
 
     def clear_logs(self):
+        """Prompt the user and clear on-disk logs if confirmed."""
         reply = QMessageBox.question(
             self, "Clear Logs",
             "Are you sure you want to clear all logs?\n"

@@ -1,6 +1,7 @@
-"""
-UI module for FileCleaner Pro application.
-Contains all user interface components.
+"""UI package exports.
+
+This module re-exports the main UI classes so consumers can import
+from `ui` directly (e.g. `from ui import MainWindow`).
 """
 
 from .main_window import MainWindow
@@ -10,6 +11,7 @@ from .tabs.logs_tab import LogsTab
 from .components.folder_chooser import FolderChooser
 from .components.preview_panel import PreviewPanel
 
+# Public API for the ui package
 __all__ = [
     'MainWindow',
     'FileCleanerTab',

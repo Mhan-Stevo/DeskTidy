@@ -1,21 +1,27 @@
-import sys
-import os
-from PyQt5.QtWidgets import QApplication, QMessageBox
-from PyQt5.QtCore import QTimer
-from ui.main_window import MainWindow
-from core.settings_manager import SettingsManager
-from core.logger import Logger
+import sys  # access to interpreter-related utilities and argv
+import os  # filesystem and OS interaction utilities
+from PyQt5.QtWidgets import QApplication, QMessageBox  # main Qt application class and message dialog
+from PyQt5.QtCore import QTimer  # Qt timer useful for scheduled callbacks (kept for potential use)
+from ui.main_window import MainWindow  # import main window class from UI package
+from core.settings_manager import SettingsManager  # import settings manager for load/save
+from core.logger import Logger  # import simple logger wrapper
 
 
 def handle_exception(exc_type, exc_value, exc_traceback):
-    """Global exception handler"""
-    import traceback
+    """Global exception handler.
 
-    # Log the error
+    This function will be assigned to `sys.excepthook` so that any
+    uncaught exception in the main thread is routed here. It formats
+    the traceback for logging and displays an error dialog to the user.
+    """
+    import traceback  # import here to avoid top-level overhead
+
+    # Format the full traceback into a readable string
     error_msg = ''.join(traceback.format_exception(exc_type, exc_value, exc_traceback))
+    # Print to stdout so developers running from a console can see the trace
     print(f"Unhandled exception: {error_msg}")
 
-    # Show error dialog
+    # Show a blocking error dialog so users are aware the app is unstable
     QMessageBox.critical(
         None,
         "Unexpected Error",
@@ -25,15 +31,22 @@ def handle_exception(exc_type, exc_value, exc_traceback):
 
 
 def check_requirements():
-    """Check if required directories exist"""
+    """Ensure required filesystem directories exist.
+
+    The application expects several directories such as `logs` and
+    UI subfolders. If they are missing, create them so subsequent
+    operations (like writing logs) don't fail.
+    """
     required_dirs = ['logs', 'ui', 'core', 'ui/components', 'ui/tabs']
 
+    # Create each required directory if it does not already exist
     for dir_name in required_dirs:
         if not os.path.exists(dir_name):
             try:
-                os.makedirs(dir_name, exist_ok=True)
+                os.makedirs(dir_name, exist_ok=True)  # create nested dirs as needed
                 print(f"Created directory: {dir_name}")
             except Exception as e:
+                # Print error but don't raise — startup may continue depending on the failure
                 print(f"Failed to create directory {dir_name}: {e}")
 
 
@@ -44,43 +57,45 @@ def main():
     # Check and create required directories
     check_requirements()
 
-    # Create application
+    # Create the Qt application instance with command-line args
     app = QApplication(sys.argv)
+    # Set metadata for the application (used by settings/storage on some OSes)
     app.setApplicationName("DeskTidy")
     app.setOrganizationName("DeskTidy")
     app.setApplicationVersion("1.0.1")
 
-    # Set application style
+    # Set a consistent UI style
     app.setStyle('Fusion')
 
-    # Create a splash message
+    # Print startup message for console users
     print("Starting DeskTidy...")
 
-    # Initialize core components
+    # Initialize the app's core components and UI, handling any startup errors
     try:
-        settings = SettingsManager()
-        settings.load()
+        settings = SettingsManager()  # create settings manager instance
+        settings.load()  # load persisted settings from disk (if present)
 
-        logger = Logger()
+        logger = Logger()  # initialize application logger
 
-        # Create and show main window
+        # Create the main window, passing in settings and logger for use by UI
         window = MainWindow(settings, logger)
-        window.show()
+        window.show()  # make the window visible
 
-        # Center window on screen
+        # Center the window on the primary screen by moving its rect
         window.move(
             app.desktop().screen().rect().center() - window.rect().center()
         )
 
-        # Show ready message
+        # Display a helpful status message in the UI
         window.status_bar.showMessage("Ready - Select a folder to begin")
 
-        # Ensure application quits properly
+        # Persist settings when the app is about to quit
         app.aboutToQuit.connect(lambda: settings.save())
 
         print("Application started successfully")
 
     except Exception as e:
+        # If anything goes wrong during initialization, show a blocking dialog
         QMessageBox.critical(
             None,
             "Startup Error",
@@ -88,7 +103,7 @@ def main():
         )
         return 1
 
-    # Start event loop
+    # Start the Qt event loop (this call blocks until the application exits)
     return app.exec_()
 
 

@@ -6,21 +6,28 @@ from PyQt5.QtCore import QObject, pyqtSignal
 
 
 class Scheduler(QObject):
-    """Background scheduler for automated cleanups"""
+    """Background scheduler for automated cleanups.
 
-    cleanup_triggered = pyqtSignal(dict)  # Emit when scheduled cleanup runs
+    Uses the `schedule` library to define jobs and runs them in a
+    background thread. When a scheduled cleanup should execute the
+    `cleanup_triggered` signal is emitted with details.
+    """
+
+    # Signal emitted with a dict describing the triggered cleanup
+    cleanup_triggered = pyqtSignal(dict)
 
     def __init__(self, settings, logger):
         super().__init__()
-        self.settings = settings
-        self.logger = logger
-        self.scheduled_jobs = []
+        self.settings = settings  # Settings manager instance
+        self.logger = logger  # Logger instance for recording events
+        self.scheduled_jobs = []  # Keep track of job descriptors
         self.running = False
 
     def schedule_daily_cleanup(self, time_str, folder_path, rules):
-        """Schedule a daily cleanup"""
+        """Schedule a job to run every day at `time_str` (HH:MM format)."""
 
         def job():
+            # Record that a scheduled job ran and notify listeners
             self.logger.log_action("Scheduled", f"Daily cleanup for {folder_path}")
             self.cleanup_triggered.emit({
                 'type': 'daily',
@@ -38,7 +45,10 @@ class Scheduler(QObject):
         })
 
     def schedule_weekly_cleanup(self, day, time_str, folder_path, rules):
-        """Schedule a weekly cleanup"""
+        """Schedule a weekly cleanup on a specific day at `time_str`.
+
+        `day` should be a weekday name (e.g. 'monday').
+        """
 
         def job():
             self.logger.log_action("Scheduled", f"Weekly cleanup for {folder_path}")
@@ -49,7 +59,7 @@ class Scheduler(QObject):
                 'time': datetime.now()
             })
 
-        # Map day string to schedule method
+        # Mapping of lowercase weekday names to schedule library methods
         day_methods = {
             'monday': schedule.every().monday,
             'tuesday': schedule.every().tuesday,
@@ -71,7 +81,7 @@ class Scheduler(QObject):
             })
 
     def start(self):
-        """Start the scheduler in a background thread"""
+        """Start the scheduler loop in a daemon thread."""
         if not self.running:
             self.running = True
             self.scheduler_thread = threading.Thread(target=self.run_scheduler, daemon=True)
@@ -79,23 +89,23 @@ class Scheduler(QObject):
             self.logger.log_action("Scheduler", "Started scheduler service")
 
     def stop(self):
-        """Stop the scheduler"""
+        """Stop the scheduler and clear scheduled jobs."""
         self.running = False
         schedule.clear()
         self.scheduled_jobs.clear()
         self.logger.log_action("Scheduler", "Stopped scheduler service")
 
     def run_scheduler(self):
-        """Run the scheduler loop"""
+        """Loop that runs pending scheduled jobs at short intervals."""
         while self.running:
             schedule.run_pending()
             time.sleep(1)
 
     def get_scheduled_jobs(self):
-        """Get all scheduled jobs"""
+        """Return a copy of scheduled job descriptors."""
         return self.scheduled_jobs.copy()
 
     def cancel_job(self, job_id):
-        """Cancel a specific job"""
+        """Cancel and remove a scheduled job by `job_id`."""
         schedule.cancel_job(job_id)
         self.scheduled_jobs = [job for job in self.scheduled_jobs if job['id'] != job_id]

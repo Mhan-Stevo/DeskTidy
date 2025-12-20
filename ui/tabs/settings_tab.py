@@ -6,6 +6,8 @@ from PyQt5.QtGui import QColor
 
 
 class SettingsTab(QWidget):
+    """Tab for editing and persisting application settings."""
+
     def __init__(self, settings):
         super().__init__()
         self.settings = settings
@@ -15,7 +17,7 @@ class SettingsTab(QWidget):
     def init_ui(self):
         layout = QVBoxLayout(self)
 
-        # Theme Selection
+        # --- Appearance group ---
         theme_group = QGroupBox("Appearance")
         theme_layout = QFormLayout()
 
@@ -31,11 +33,11 @@ class SettingsTab(QWidget):
         theme_group.setLayout(theme_layout)
         layout.addWidget(theme_group)
 
-        # Cleanup Rules
+        # --- Cleanup Rules group ---
         rules_group = QGroupBox("Cleanup Rules")
         rules_layout = QVBoxLayout()
 
-        # File types to delete
+        # File type checkboxes
         file_types_layout = QFormLayout()
 
         self.delete_tmp = QCheckBox("Delete temporary files (.tmp, .temp)")
@@ -50,7 +52,7 @@ class SettingsTab(QWidget):
 
         rules_layout.addLayout(file_types_layout)
 
-        # File age
+        # File age threshold
         age_layout = QHBoxLayout()
         age_layout.addWidget(QLabel("Delete files older than:"))
 
@@ -63,7 +65,7 @@ class SettingsTab(QWidget):
         age_layout.addStretch()
         rules_layout.addLayout(age_layout)
 
-        # Minimum size
+        # Minimum size threshold
         size_layout = QHBoxLayout()
         size_layout.addWidget(QLabel("Minimum file size to delete:"))
 
@@ -79,7 +81,7 @@ class SettingsTab(QWidget):
         rules_group.setLayout(rules_layout)
         layout.addWidget(rules_group)
 
-        # Custom File Extensions
+        # --- Custom File Extensions ---
         extensions_group = QGroupBox("Custom File Extensions to Delete")
         extensions_layout = QVBoxLayout()
 
@@ -103,7 +105,7 @@ class SettingsTab(QWidget):
         extensions_group.setLayout(extensions_layout)
         layout.addWidget(extensions_group)
 
-        # Advanced Settings
+        # --- Advanced Settings ---
         advanced_group = QGroupBox("Advanced Settings")
         advanced_layout = QFormLayout()
 
@@ -132,11 +134,11 @@ class SettingsTab(QWidget):
         layout.addWidget(self.save_btn)
 
     def load_settings(self):
-        # Load theme
+        # Populate UI widgets from persisted settings
         theme = self.settings.get("theme", "light")
         self.theme_combo.setCurrentText(theme)
 
-        # Load rules
+        # Load cleanup rules
         rules = self.settings.get("rules", {})
         self.delete_tmp.setChecked(rules.get("delete_tmp", True))
         self.delete_log.setChecked(rules.get("delete_log", False))
@@ -144,7 +146,7 @@ class SettingsTab(QWidget):
         self.file_age.setValue(rules.get("file_age_days", 30))
         self.min_size.setValue(rules.get("min_size_mb", 1))
 
-        # Load extensions
+        # Load custom extensions
         extensions = rules.get("custom_extensions", [])
         self.extensions_list.clear()
         self.extensions_list.addItems(extensions)
@@ -155,6 +157,7 @@ class SettingsTab(QWidget):
         self.max_file_size.setValue(self.settings.get("max_file_size", 100))
 
     def save_theme(self, theme):
+        # Persist only the theme as it changes
         self.settings.set("theme", theme)
 
     def choose_accent_color(self):
@@ -163,6 +166,7 @@ class SettingsTab(QWidget):
             self.settings.set("accent_color", color.name())
 
     def add_extension(self):
+        # Normalize extension and add to the list if not present
         extension = self.new_extension_input.text().strip()
         if extension and not extension.startswith('.'):
             extension = '.' + extension
@@ -173,12 +177,13 @@ class SettingsTab(QWidget):
             self.new_extension_input.clear()
 
     def remove_extension(self):
+        # Remove the currently selected extension from the list
         current_row = self.extensions_list.currentRow()
         if current_row >= 0:
             self.extensions_list.takeItem(current_row)
 
     def save_all_settings(self):
-        # Save rules
+        # Gather rules from widgets and persist them via SettingsManager
         rules = {
             "delete_tmp": self.delete_tmp.isChecked(),
             "delete_log": self.delete_log.isChecked(),
@@ -190,12 +195,12 @@ class SettingsTab(QWidget):
         }
         self.settings.set("rules", rules)
 
-        # Save advanced settings
+        # Advanced options
         self.settings.set("auto_preview", self.auto_preview.isChecked())
         self.settings.set("confirm_deletions", self.confirm_deletions.isChecked())
         self.settings.set("max_file_size", self.max_file_size.value())
 
-        # Save to disk
+        # Persist to disk
         self.settings.save()
 
         QMessageBox.information(self, "Settings", "✅ Settings saved successfully!")
